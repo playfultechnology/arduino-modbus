@@ -38,13 +38,15 @@
 // INCLUDES
 #include <SoftwareSerial.h>
 // https://github.com/4-20ma/ModbusMaster/
-#include <ModbusMaster.h>
+#include "src/ModbusMaster.h"
 
 // GLOBALS
-SoftwareSerial RS485_serial (9, 8);
+// Tx/Rx
+SoftwareSerial RS485_serial (A1, A0);
 // Instantiate ModbusMaster object
 ModbusMaster node;
-  uint8_t result;
+// Return value
+uint8_t result;
 // The value to send
 uint32_t value = 1;
 
@@ -56,7 +58,6 @@ void setup(){
   RS485_serial.begin(9600);
   // Connect to Device ID 1
   node.begin(1, RS485_serial);
- 
 
   // Read 1x 16-bit register from address 0xFE to RX buffer
   result = node.readHoldingRegisters(0xFE, 1);
@@ -81,51 +82,60 @@ void setup(){
 }
 
 void loop() {
- 
 
-/*
-  // Toggle between open (0x01) and close (0x02)
-  if(value==1) {value = 2;}
-  else{value = 1;}
+  Serial.println("Opening channels individually");
+  for(uint16_t i=1; i<=8; i++) {
+    result = node.writeSingleRegister(i, 0x0100);
+    delay(500);
+  }  
 
-  // set word 0 of TX buffer to least-significant word of counter (bits 15..0)
-  node.setTransmitBuffer(0, lowWord(value));
-  
-  // set word 1 of TX buffer to most-significant word of counter (bits 31..16)
-  node.setTransmitBuffer(1, highWord(value));
-
-  node.setTransmitBuffer(0, 0x01);
-  node.setTransmitBuffer(1, 0x00);
-*/
-  uint16_t open = 0x0100;
-  uint16_t close = 0x0200;
-  uint16_t toggle = 0x0300;
-  uint16_t openall = 0x0700;
-  uint16_t closeall = 0x0800;
-
-// slave: write TX buffer to (2) 16-bit registers starting at register 1
-  /*
-  result = node.writeSingleRegister(0x0001,0x0300);
-  if (result == node.ku8MBSuccess) {
-    Serial.println(F("Toggle output 1 state!"));
+  Serial.println("Closing channels individually");
+  for(int i=1; i<=8; i++) {
+    result = node.writeSingleRegister(i, 0x0200);
+    delay(500);
   }
-*/
-  delay(500);
 
-  // The transmit buffer is an arrat of uint16_t  values. i.e. 0xFF00 is one entry.
-
-  for(int i=0;i<8;i++){
-    // set word 0 of TX buffer to the toggle command, 0x03
-    node.setTransmitBuffer(i, 0x0300);
-  }
-  // slave: write TX buffer to (8) 16-bit registers starting at register 0
+  Serial.println("Setting multiple channels");
+  node.setTransmitBuffer(0, 0x0200);
+  node.setTransmitBuffer(1, 0x0100);
+  node.setTransmitBuffer(2, 0x0200);
+  node.setTransmitBuffer(3, 0x0100);
+  node.setTransmitBuffer(4, 0x0200);
+  node.setTransmitBuffer(5, 0x0100);
+  node.setTransmitBuffer(6, 0x0200);
+  node.setTransmitBuffer(7, 0x0100);
+  // Write TX buffer to (8) 16-bit registers starting at register 1
   result = node.writeMultipleRegisters(0x0001, 8);
   if (result == node.ku8MBSuccess) {
     Serial.println(F("Toggled all output states"));
   }
-
   delay(500);
 
+  Serial.println("Toggling multiple channels");
+  // Fill the transmit buffer
+  for(int i=0;i<8;i++){
+    // Set word 0 of TX buffer to the toggle command, 0x0300
+    node.setTransmitBuffer(i, 0x0300);
+  }
+  for(int repeats = 0; repeats<3; repeats++){
+    // Write TX buffer to (8) 16-bit registers starting at register 1
+    result = node.writeMultipleRegisters(0x0001, 8);
+    if (result == node.ku8MBSuccess) {
+      Serial.println(F("Toggled all output states"));
+    }
+    delay(500);
+  }
+
+  Serial.println("Opening all");
+  result = node.writeSingleRegister(0, 0x0700);
+  delay(500);
+
+  Serial.println("Closing all");
+  result = node.writeSingleRegister(0, 0x0800);
+  delay(500);
+
+
+  Serial.println("Reading Inputs");
   // Read 8x 16-bit registers from address 0x81 to RX buffer
   result = node.readHoldingRegisters(0x81, 8);
   // Do something with data if read is successful
@@ -136,8 +146,7 @@ void loop() {
     }
     Serial.println("");
   }
-
- delay(500);
+  delay(500);
 
   // Read 8x 16-bit registers from address 0x01 to RX buffer
   result = node.readHoldingRegisters(0x01, 8);
@@ -149,26 +158,5 @@ void loop() {
     }
     Serial.println("");
   }
-
   delay(500);
-/*
-  // set word 0 of TX buffer to least-significant word of counter (bits 15..0)
-  node.setTransmitBuffer(0, lowWord(i));
-  
-  // set word 1 of TX buffer to most-significant word of counter (bits 31..16)
-  node.setTransmitBuffer(1, highWord(i));
-  
-  // slave: write TX buffer to (2) 16-bit registers starting at register 0
-  result = node.writeMultipleRegisters(0, 2);
-  
-  // slave: read (6) 16-bit registers starting at register 2 to RX buffer
-  result = node.readHoldingRegisters(2, 6);
-  
-  // do something with data if read is successful
-  if (result == node.ku8MBSuccess) {
-    for (j = 0; j < 6; j++) {
-      data[j] = node.getResponseBuffer(j);
-    }
-  }
-*/
 }
